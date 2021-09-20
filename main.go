@@ -40,7 +40,6 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -67,7 +66,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "fdf6809e.docker.io",
+		LeaderElectionID:       "fdf6809e.example.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

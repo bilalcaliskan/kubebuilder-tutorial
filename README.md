@@ -7,7 +7,7 @@ This project mainly based on [Kubebuilder Book](https://book.kubebuilder.io/cron
 ### Create a Project
 Create a directory, and then run the init command inside of it to initialize a new project. Follows an example.
 ```shell
-$ kubebuilder init --domain docker.io --repo github.com/bilalcaliskan/kubebuilder-tutorial
+$ kubebuilder init --domain example.com --repo github.com/bilalcaliskan/kubebuilder-tutorial
 ```
 
 **--domain** flag defines the domain of the container registry, while **--repo** defines the github repository url.
