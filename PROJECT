@@ -3,4 +3,14 @@ layout:
 - go.kubebuilder.io/v3
 projectName: kubebuilder-tutorial
 repo: github.com/bilalcaliskan/kubebuilder-tutorial
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: example.com
+  group: batch
+  kind: CronJob
+  path: github.com/bilalcaliskan/kubebuilder-tutorial/api/v1
+  version: v1
 version: "3"
