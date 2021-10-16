@@ -17,8 +17,8 @@ limitations under the License.
 package controllers
 
 /*
-	We'll start out with some imports.  You'll see below that we'll need a few more imports
-	than those scaffolded for us.  We'll talk about each one when we use it.
+We'll start out with some imports.  You'll see below that we'll need a few more imports
+than those scaffolded for us.  We'll talk about each one when we use it.
 */
 
 import (
@@ -40,10 +40,16 @@ import (
 )
 
 /*
-	Next, we'll need a Clock, which will allow us to fake timing in our tests.
-*/
+CronJobReconciler is a struct that implements Reconciler that  implements a Kubernetes API for a specific Resource by
+Creating, Updating or Deleting Kubernetes objects, or by making changes to systems external to the
+cluster (e.g. cloudproviders, github, etc).
 
-// CronJobReconciler reconciles a CronJob object
+reconcile implementations compare the state specified in an object by a user against the actual cluster state, and
+then perform operations to make the actual cluster state reflect the state specified by the user.
+
+Typically, reconcile is triggered by a Controller in response to cluster Events (e.g. Creating, Updating, Deleting
+Kubernetes objects) or external Events (GitHub Webhooks, polling external sources, etc).
+ */
 type CronJobReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -51,8 +57,10 @@ type CronJobReconciler struct {
 }
 
 /*
-	We'll mock out the clock to make it easier to jump around in time while testing,
-	the "real" clock just calls `time.Now`.
+We'll need a Clock, which will allow us to fake timing in our tests.
+
+We'll mock out the clock to make it easier to jump around in time while testing,
+the "real" clock just calls `time.Now`.
 */
 type realClock struct{}
 
@@ -66,9 +74,8 @@ type Clock interface {
 // +kubebuilder:docs-gen:collapse=Clock
 
 /*
-	Notice that we need a few more RBAC permissions -- since we're creating and
-	managing jobs now, we'll need permissions for those, which means adding
-	a couple more [markers](/reference/markers/rbac.md).
+Notice that we need a few more RBAC permissions -- since we're creating and managing jobs now, we'll need
+permissions for those, which means adding a couple more [markers](/reference/markers/rbac.md).
 */
 
 //+kubebuilder:rbac:groups=batch.example.com,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
@@ -82,39 +89,54 @@ var (
 	scheduledTimeAnnotation = "batch.example.com/scheduled-at"
 )
 
-/*
-	Now, we get to the heart of the controller -- the reconciler logic.
-*/
+// Reconcile makes CronJobReconciler a Reconciler
 func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("inside reconciliation logic", "name", req.String())
 
+
+
+
+
+
+
+
+
 	/*
-		### 1: Load the CronJob by name
+	######### 1: Load the CronJob by name
 
-		We'll fetch the CronJob using our client.  All client methods take a context (to allow for cancellation) as
-		their first argument, and the object in question as their last.  Get is a bit special, in that it takes a
-		[`NamespacedName`](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client?tab=doc#ObjectKey)
-		as the middle argument (most don't have a middle argument, as we'll see below).
+	We'll fetch the CronJob using our client.  All client methods take a context (to allow for cancellation) as
+	their first argument, and the object in question as their last.  Get is a bit special, in that it takes a
+	[`NamespacedName`](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client?tab=doc#ObjectKey)
+	as the middle argument (most don't have a middle argument, as we'll see below).
 
-		Many client methods also take variadic options at the end.
+	Many client methods also take variadic options at the end.
 	*/
 	var cronJob batchv1.CronJob
 	if err := r.Get(ctx, req.NamespacedName, &cronJob); err != nil {
 		logger.Error(err, "unable to fetch CronJob")
-		// we'll ignore not-found errors, since they can't be fixed by an immediate
-		// requeue (we'll need to wait for a new notification), and we can get them
-		// on deleted requests.
+		/*
+		We'll ignore not-found errors, since they can't be fixed by an immediate requeue (we'll need to wait for a
+		new notification), and we can get them on deleted requests.
+		*/
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+
+
+
+
+
+
+
+
 	/*
-		### 2: List all active jobs, and update the status
+	######### 2: List all active jobs, and update the status
 
-		To fully update our status, we'll need to list all child jobs in this namespace that belong to this CronJob.
+	To fully update our status, we'll need to list all child jobs in this namespace that belong to this CronJob.
 
-		Similarly to Get, we can use the List method to list the child jobs.  Notice that we use variadic options to
-		set the namespace and field match (which is actually an index lookup that we set up below).
+	Similarly to Get, we can use the List method to list the child jobs.  Notice that we use variadic options to
+	set the namespace and field match (which is actually an index lookup that we set up below).
 	*/
 	var childJobs kbatch.JobList
 	if err := r.List(ctx, &childJobs, client.InNamespace(req.Namespace), client.MatchingFields{jobOwnerKey: req.Name}); err != nil {
@@ -122,20 +144,21 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	/*
-		### What is this index about?(on the r.List function call client.MatchingFields{jobOwnerKey: req.Name})
-		The reconciler fetches all jobs owned by the cronjob for the status. As our number of cronjobs increases,
-		looking these up can become quite slow as we have to filter through all of them. For a more efficient lookup,
-		these jobs will be indexed locally on the controller's name. A jobOwnerKey field is added to the cached job
-		objects. This key references the owning controller and functions as the index. Later in this
-		document we will configure the manager to actually index this field.
+	### What is this index about?(on the r.List function call client.MatchingFields{jobOwnerKey: req.Name})
 
-		Once we have all the jobs we own, we'll split them into active, successful, and failed jobs, keeping track
-		of the most recent run so that we can record it in status.  Remember, status should be able to be
-		reconstituted from the state of the world, so it's generally not a good idea to read from the status of the
-		root object. Instead, you should reconstruct it every run.  That's what we'll do here.
+	The reconciler fetches all jobs owned by the cronjob for the status. As our number of cronjobs increases,
+	looking these up can become quite slow as we have to filter through all of them. For a more efficient lookup,
+	these jobs will be indexed locally on the controller's name. A jobOwnerKey field is added to the cached job
+	objects. This key references the owning controller and functions as the index. Later in this
+	document we will configure the manager to actually index this field.
 
-		We can check if a job is "finished" and whether it succeeded or failed using status conditions.  We'll
-		put that logic in a helper to make our code cleaner.
+	Once we have all the jobs we own, we'll split them into active, successful, and failed jobs, keeping track
+	of the most recent run so that we can record it in status.  Remember, status should be able to be
+	reconstituted from the state of the world, so it's generally not a good idea to read from the status of the
+	root object. Instead, you should reconstruct it every run.  That's what we'll do here.
+
+	We can check if a job is "finished" and whether it succeeded or failed using status conditions.  We'll
+	put that logic in a helper to make our code cleaner.
 	*/
 
 	// find the active list of jobs
@@ -145,9 +168,9 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	var mostRecentTime *time.Time // find the last run so we can update the status
 
 	/*
-		We consider a job "finished" if it has a "Complete" or "Failed" condition marked as true.
-		Status conditions allow us to add extensible status information to our objects that other
-		humans and controllers can examine to check things like completion and health.
+	We consider a job "finished" if it has a "Complete" or "Failed" condition marked as true. Status conditions
+	allow us to add extensible status information to our objects that other humans and controllers can examine to
+	check things like completion and health.
 	*/
 	isJobFinished := func(job *kbatch.Job) (bool, kbatch.JobConditionType) {
 		for _, c := range job.Status.Conditions {
@@ -160,10 +183,7 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	// +kubebuilder:docs-gen:collapse=isJobFinished
 
-	/*
-		We'll use a helper to extract the scheduled time from the annotation that
-		we added during job creation.
-	*/
+	// We'll use a helper to extract the scheduled time from the annotation that we added during job creation.
 	getScheduledTimeForJob := func(job *kbatch.Job) (*time.Time, error) {
 		timeRaw := job.Annotations[scheduledTimeAnnotation]
 		if len(timeRaw) == 0 {
@@ -190,8 +210,7 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			successfulJobs = append(successfulJobs, &childJobs.Items[i])
 		}
 
-		// We'll store the launch time in an annotation, so we'll reconstitute that from
-		// the active jobs themselves.
+		// We'll store the launch time in an annotation, so we'll reconstitute that from the active jobs themselves.
 		scheduledTimeForJob, err := getScheduledTimeForJob(&job)
 		if err != nil {
 			logger.Error(err, "unable to parse schedule time for child job", "job", &job)
@@ -226,37 +245,41 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	/*
-		Here, we'll log how many jobs we observed at a slightly higher logging level,
-		for debugging.  Notice how instead of using a format string, we use a fixed message,
-		and attach key-value pairs with the extra information.  This makes it easier to
-		filter and query log lines.
+	Here, we'll log how many jobs we observed at a slightly higher logging level, for debugging.  Notice how instead
+	of using a format string, we use a fixed message, and attach key-value pairs with the extra information.  This
+	makes it easier to filter and query log lines.
 	*/
 	logger.V(1).Info("job count", "active jobs", len(activeJobs), "successful jobs",
 		len(successfulJobs), "failed jobs", len(failedJobs))
 
 	/*
-		Using the date we've gathered, we'll update the status of our CRD. Just like before, we use our client.
-		To specifically update the status subresource, we'll use the `Status` part of the client, with the `Update`
-		method. The status subresource ignores changes to spec, so it's less likely to conflict with any other
-		updates, and can have separate permissions.
+	Using the date we've gathered, we'll update the status of our CRD. Just like before, we use our client.
+	To specifically update the status subresource, we'll use the `Status` part of the client, with the `Update`
+	method. The status subresource ignores changes to spec, so it's less likely to conflict with any other
+	updates, and can have separate permissions.
 	*/
 	if err := r.Status().Update(ctx, &cronJob); err != nil {
 		logger.Error(err, "unable to update CronJob status")
 		return ctrl.Result{}, err
 	}
 
+
+
+
+
+
+
+
 	/*
-		### 3: Clean up old jobs according to the history limit
+	######### 3: Clean up old jobs according to the history limit
 
-		Once we've updated our status, we can move on to ensuring that the status of
-		the world matches what we want in our spec.
+	Once we've updated our status, we can move on to ensuring that the status of the world matches what we
+	want in our spec.
 
-		First, we'll try to clean up old jobs, so that we don't leave too many lying
-		around.
+	First, we'll try to clean up old jobs, so that we don't leave too many lying around.
 	*/
 
-	// NB: deleting these is "best effort" -- if we fail on a particular one,
-	// we won't requeue just to finish the deleting.
+	// NB: deleting these is "best effort" -- if we fail on a particular one, we won't requeue just to finish the deleting.
 	if cronJob.Spec.FailedJobsHistoryLimit != nil {
 		sort.Slice(failedJobs, func(i, j int) bool {
 			if failedJobs[i].Status.StartTime == nil {
@@ -298,12 +321,17 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 
-	/*
-		### 4: Check if we're suspended
 
-		If this object is suspended, we don't want to run any jobs, so we'll stop now.
-		This is useful if something's broken with the job we're running and we want to
-		pause runs to investigate or putz with the cluster, without deleting the object.
+
+
+
+
+	/*
+	######### 4: Check if we're suspended
+
+	If this object is suspended, we don't want to run any jobs, so we'll stop now. This is useful if something's
+	broken with the job we're running and we want to pause runs to investigate or putz with the cluster, without
+	deleting the object.
 	*/
 
 	if cronJob.Spec.Suspend != nil && *cronJob.Spec.Suspend {
@@ -312,18 +340,23 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 
+
+
+
+
+
 	/*
-		### 5: Get the next scheduled run
+	######### 5: Get the next scheduled run
 
-		If we're not paused, we'll need to calculate the next scheduled run, and whether
-		or not we've got a run that we haven't processed yet.
+	If we're not paused, we'll need to calculate the next scheduled run, and whether or not we've got a run that
+	we haven't processed yet.
 
-		We'll calculate the next scheduled time using our helpful cron library. We'll start calculating
-		appropriate times from our last run, or the creation of the CronJob if we can't find a last run.
+	We'll calculate the next scheduled time using our helpful cron library. We'll start calculating appropriate
+	times from our last run, or the creation of the CronJob if we can't find a last run.
 
-		If there are too many missed runs and we don't have any deadlines set, we'll bail so that we don't
-		cause issues on controller restarts or wedges. Otherwise, we'll just return the missed runs (of which
-		we'll just use the latest), and the next run, so that we can know when it's time to reconcile again.
+	If there are too many missed runs and we don't have any deadlines set, we'll bail so that we don't cause
+	issues on controller restarts or wedges. Otherwise, we'll just return the missed runs (of which we'll
+	just use the latest), and the next run, so that we can know when it's time to reconcile again.
 	*/
 
 	getNextSchedule := func(cronJob *batchv1.CronJob, now time.Time) (lastMissed time.Time, next time.Time, err error) {
@@ -332,9 +365,10 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return time.Time{}, time.Time{}, fmt.Errorf("unparseable schedule %q: %v", cronJob.Spec.Schedule, err)
 		}
 
-		// for optimization purposes, cheat a bit and start from our last observed run time
-		// we could reconstitute this here, but there's not much point, since we've
-		// just updated it.
+		/*
+		For optimization purposes, cheat a bit and start from our last observed run time we could reconstitute this
+		here, but there's not much point, since we've just updated it.
+		*/
 		var earliestTime time.Time
 		if cronJob.Status.LastScheduleTime != nil {
 			earliestTime = cronJob.Status.LastScheduleTime.Time
@@ -357,20 +391,17 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		starts := 0
 		for t := sched.Next(earliestTime); !t.After(now); t = sched.Next(t) {
 			lastMissed = t
-			// An object might miss several starts. For example, if
-			// controller gets wedged on Friday at 5:01pm when everyone has
-			// gone home, and someone comes in on Tuesday AM and discovers
-			// the problem and restarts the controller, then all the hourly
-			// jobs, more than 80 of them for one hourly scheduledJob, should
-			// all start running with no further intervention (if the scheduledJob
-			// allows concurrency and late starts).
-			//
-			// However, if there is a bug somewhere, or incorrect clock
-			// on controller's server or apiservers (for setting creationTimestamp)
-			// then there could be so many missed start times (it could be off
-			// by decades or more), that it would eat up all the CPU and memory
-			// of this controller. In that case, we want to not try to list
-			// all the missed start times.
+			/*
+			An object might miss several starts. For example, if controller gets wedged on Friday at 5:01pm when
+			everyone has gone home, and someone comes in on Tuesday AM and discovers the problem and restarts the
+			controller, then all the hourly jobs, more than 80 of them for one hourly scheduledJob, should all
+			start running with no further intervention (if the scheduledJob allows concurrency and late starts).
+
+			However, if there is a bug somewhere, or incorrect clock on controller's server or apiservers (for
+			setting creationTimestamp) then there could be so many missed start times (it could be off by decades
+			or more), that it would eat up all the CPU and memory of this controller. In that case, we want to not
+			try to list all the missed start times.
+			*/
 			starts++
 			if starts > 100 {
 				// We can't get the most recent times so just return an empty slice
@@ -382,35 +413,35 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	// +kubebuilder:docs-gen:collapse=getNextSchedule
 
-	// figure out the next times that we need to create
-	// jobs at (or anything we missed).
+	// Figure out the next times that we need to create jobs at (or anything we missed).
 	missedRun, nextRun, err := getNextSchedule(&cronJob, r.Now())
 	if err != nil {
 		logger.Error(err, "unable to figure out CronJob schedule")
-		// we don't really care about requeuing until we get an update that
-		// fixes the schedule, so don't return an error
+		// We don't really care about requeuing until we get an update that fixes the schedule, so don't return an error
 		return ctrl.Result{}, nil
 	}
 
-	/*
-		We'll prep our eventual request to requeue until the next job, and then figure
-		out if we actually need to run.
-	*/
+	// We'll prep our eventual request to requeue until the next job, and then figure out if we actually need to run.
 	scheduledResult := ctrl.Result{RequeueAfter: nextRun.Sub(r.Now())} // save this so we can re-use it elsewhere
 	logger = logger.WithValues("now", r.Now(), "next run", nextRun, "diff", nextRun.Sub(r.Now()))
 
 
-	/*
-		### 6: Run a new job if it's on schedule, not past the deadline, and not blocked by our concurrency policy
 
-		If we've missed a run, and we're still within the deadline to start it, we'll need to run a job.
+
+
+
+
+	/*
+	######### 6: Run a new job if it's on schedule, not past the deadline, and not blocked by our concurrency policy
+
+	If we've missed a run, and we're still within the deadline to start it, we'll need to run a job.
 	*/
 	if missedRun.IsZero() {
 		logger.V(1).Info("no upcoming scheduled times, sleeping until next")
 		return scheduledResult, nil
 	}
 
-	// make sure we're not too late to start the run
+	// Make sure we're not too late to start the run
 	logger = logger.WithValues("current run", missedRun)
 	tooLate := false
 	if cronJob.Spec.StartingDeadlineSeconds != nil {
@@ -423,12 +454,13 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	/*
-		If we actually have to run a job, we'll need to either wait till existing ones finish,
-		replace the existing ones, or just add new ones.  If our information is out of date due
-		to cache delay, we'll get a requeue when we get up-to-date information.
+	If we actually have to run a job, we'll need to either wait till existing ones finish, replace the existing
+	ones, or just add new ones.  If our information is out of date due to cache delay, we'll get a requeue when
+	we get up-to-date information.
+
+	We need to figure out how to run this job -- concurrency policy might forbid us from running multiple at the
+	same time...
 	*/
-	// figure out how to run this job -- concurrency policy might forbid us from running
-	// multiple at the same time...
 	if cronJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent && len(activeJobs) > 0 {
 		logger.V(1).Info("concurrency policy blocks concurrent runs, skipping", "num active", len(activeJobs))
 		return scheduledResult, nil
@@ -437,7 +469,7 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// ...or instruct us to replace existing ones...
 	if cronJob.Spec.ConcurrencyPolicy == batchv1.ReplaceConcurrent {
 		for _, activeJob := range activeJobs {
-			// we don't care if the job was already deleted
+			// We don't care if the job was already deleted
 			if err := r.Delete(ctx, activeJob, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
 				logger.Error(err, "unable to delete active job", "job", activeJob)
 				return ctrl.Result{}, err
@@ -446,17 +478,15 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	/*
-		Once we've figured out what to do with existing jobs, we'll actually create our desired job
-	*/
+	Once we've figured out what to do with existing jobs, we'll actually create our desired job
 
-	/*
-		We need to construct a job based on our CronJob's template.  We'll copy over the spec
-		from the template and copy some basic object meta.
-		Then, we'll set the "scheduled time" annotation so that we can reconstitute our
-		`LastScheduleTime` field each reconcile.
-		Finally, we'll need to set an owner reference.  This allows the Kubernetes garbage collector
-		to clean up jobs when we delete the CronJob, and allows controller-runtime to figure out
-		which cronjob needs to be reconciled when a given job changes (is added, deleted, completes, etc).
+	We need to construct a job based on our CronJob's template.  We'll copy over the spec from the template and
+	copy some basic object meta. Then, we'll set the "scheduled time" annotation so that we can reconstitute our
+	`LastScheduleTime` field each reconcile.
+
+	Finally, we'll need to set an owner reference.  This allows the Kubernetes garbage collector to clean up jobs
+	when we delete the CronJob, and allows controller-runtime to figure out which cronjob needs to be reconciled
+	when a given job changes (is added, deleted, completes, etc).
 	*/
 	constructJobForCronJob := func(cronJob *batchv1.CronJob, scheduledTime time.Time) (*kbatch.Job, error) {
 		// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
@@ -471,13 +501,16 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			},
 			Spec: *cronJob.Spec.JobTemplate.Spec.DeepCopy(),
 		}
+
 		for k, v := range cronJob.Spec.JobTemplate.Annotations {
 			job.Annotations[k] = v
 		}
 		job.Annotations[scheduledTimeAnnotation] = scheduledTime.Format(time.RFC3339)
+
 		for k, v := range cronJob.Spec.JobTemplate.Labels {
 			job.Labels[k] = v
 		}
+
 		if err := ctrl.SetControllerReference(cronJob, job, r.Scheme); err != nil {
 			return nil, err
 		}
@@ -486,11 +519,11 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	// +kubebuilder:docs-gen:collapse=constructJobForCronJob
 
-	// actually make the job...
+	// We are making the actual job right here!
 	job, err := constructJobForCronJob(&cronJob, missedRun)
 	if err != nil {
 		logger.Error(err, "unable to construct job from template")
-		// don't bother requeuing until we get a change to the spec
+		// Don't bother requeuing until we get a change to the spec
 		return scheduledResult, nil
 	}
 
@@ -503,29 +536,35 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger.V(1).Info("created Job for CronJob run", "job", job)
 
 
-	/*
-		### 7: Requeue when we either see a running job or it's time for the next scheduled run
 
-		Finally, we'll return the result that we prepped above, that says we want to requeue
-		when our next run would need to occur.  This is taken as a maximum deadline -- if something
-		else changes in between, like our job starts or finishes, we get modified, etc, we might
-		reconcile again sooner.
+
+
+
+	/*
+	######### 7: Requeue when we either see a running job or it's time for the next scheduled run
+
+	Finally, we'll return the result that we prepped above, that says we want to requeue when our next run would
+	need to occur.  This is taken as a maximum deadline -- if something else changes in between, like our job
+	starts or finishes, we get modified, etc, we might reconcile again sooner.
 	*/
 
 	// we'll requeue once we see the running job, and update our status
 	return scheduledResult, nil
 }
 
+
+
+
 /*
-	### Setup
+######### Setup
 
-	Finally, we'll update our setup.  In order to allow our reconciler to quickly look up Jobs by their owner,
-	we'll need an index.  We declare an index key that we can later use with the client as a pseudo-field name,
-	and then describe how to extract the indexed value from the Job object.  The indexer will automatically take
-	care of namespaces for us, so we just have to extract the owner name if the Job has a CronJob owner.
+Finally, we'll update our setup.  In order to allow our reconciler to quickly look up Jobs by their owner,
+we'll need an index.  We declare an index key that we can later use with the client as a pseudo-field name,
+and then describe how to extract the indexed value from the Job object.  The indexer will automatically take
+care of namespaces for us, so we just have to extract the owner name if the Job has a CronJob owner.
 
-	Additionally, we'll inform the manager that this controller owns some Jobs, so that it will automatically
-	call Reconcile on the underlying CronJob when a Job changes, is deleted, etc.
+Additionally, we'll inform the manager that this controller owns some Jobs, so that it will automatically
+call Reconcile on the underlying CronJob when a Job changes, is deleted, etc.
 */
 var (
 	jobOwnerKey = ".metadata.controller"
