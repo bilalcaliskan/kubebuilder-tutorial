@@ -1,5 +1,5 @@
 # Kubebuilder Tutorial
-This is a project for learning [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder). 
+This is a project for learning [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder).
 
 This project mainly based on [Kubebuilder Book](https://book.kubebuilder.io/cronjob-tutorial/cronjob-tutorial.html) but may have additional features.
 
@@ -62,3 +62,9 @@ $ make undeploy
 The following diagram will help you get a better idea over the Kubebuilder concepts and architecture.
 
 ![Kubebuilder Architectural Diagram](./resources/kubebuilder_architecture.png)
+
+## Development
+This project requires below tools while developing:
+- [Golang 1.16](https://golang.org/doc/go1.16)
+- [pre-commit](https://pre-commit.com/)
+- [golangci-lint](https://golangci-lint.run/usage/install/) - required by [pre-commit](https://pre-commit.com/)
