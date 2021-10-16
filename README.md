@@ -58,10 +58,62 @@ Undeploy the controller from cluster:
 $ make undeploy
 ```
 
+### Implementing defaulting/validating webhooks
+If you want to implement [admission webhooks](https://book.kubebuilder.io/reference/admission-webhook.html) for your CRD, the only thing you need to do is to implement the
+**Defaulter** and (or) the **Validator** interface.
+
+Kubebuilder takes care of the rest for you, such as:
+- Creating the webhook server.
+- Ensuring the server has been added in the manager.
+- Creating handlers for your webhooks.
+- Registering each handler with a path in your server.
+
+First, let’s scaffold the webhooks for our CRD (CronJob). We’ll need to run the following
+command with the **--defaulting** and **--programmatic-validation** flags (since our test
+project will use defaulting and validating webhooks):
+```shell
+$ kubebuilder create webhook --group batch --version v1 --kind CronJob --defaulting --programmatic-validation
+```
+
+This will scaffold the webhook functions and register your webhook with the manager in your
+[main.go](main.go) for you.
+
 ## Architectural Concept Diagram
 The following diagram will help you get a better idea over the Kubebuilder concepts and architecture.
 
 ![Kubebuilder Architectural Diagram](./resources/kubebuilder_architecture.png)
+
+## More On Admission Webhooks
+Admission webhooks are HTTP callbacks that receive admission requests, process them and return
+admission responses.
+
+Kubernetes provides the following types of admission webhooks:
+- **Mutating Admission Webhook:** These can mutate the object while it’s being created or
+  updated, before it gets stored. It can be used to default fields in a resource requests,
+  e.g. fields in Deployment that are not specified by the user. It can be used to inject
+  sidecar containers.
+- **Validating Admission Webhook:** These can validate the object while it’s being created
+  or updated, before it gets stored. It allows more complex validation than pure schema-based
+  validation. e.g. cross-field validation and pod image whitelisting.
+
+The apiserver by default doesn’t authenticate itself to the webhooks. However, if you want
+to authenticate the clients, you can configure the apiserver to use basic auth, bearer token,
+or a cert to authenticate itself to the webhooks. You can find detailed steps [here](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#authenticate-apiservers).
+
+## Markers for Config/Code Generation
+KubeBuilder makes use of a tool called controller-gen for generating utility code and
+Kubernetes YAML. This code and config generation is controlled by the presence of special
+**marker comments** in Go code.
+
+Markers are single-line comments that start with a plus, followed by a marker name,
+optionally followed by some marker specific configuration:
+```go
+// +kubebuilder:validation:Optional
+// +kubebuilder:validation:MaxItems=2
+// +kubebuilder:printcolumn:JSONPath=".status.replicas",name=Replicas,type=string
+```
+
+You can read more about markers [right here](https://book.kubebuilder.io/reference/markers.html).
 
 ## Development
 This project requires below tools while developing:

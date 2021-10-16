@@ -42,13 +42,15 @@ import (
 
 import (
 	"flag"
-	batchv1 "github.com/bilalcaliskan/kubebuilder-tutorial/api/v1"
-	"github.com/bilalcaliskan/kubebuilder-tutorial/controllers"
-	"k8s.io/apimachinery/pkg/runtime"
 	"os"
+
+	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	batchv1 "github.com/bilalcaliskan/kubebuilder-tutorial/api/v1"
+	"github.com/bilalcaliskan/kubebuilder-tutorial/controllers"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -144,6 +146,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&batchv1.CronJob{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "CronJob")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
