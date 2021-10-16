@@ -177,3 +177,5 @@ func validateScheduleFormat(schedule string, fldPath *field.Path) *field.Error {
 	}
 	return nil
 }
+
+// TODO: add something for core types -> https://book.kubebuilder.io/reference/webhook-for-core-types.html

@@ -32,7 +32,7 @@ $ make install
 
 Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
 ```shell
-$ make run
+$ make run ENABLE_WEBHOOKS=false
 ```
 
 ### Run It On the Cluster
@@ -77,6 +77,49 @@ $ kubebuilder create webhook --group batch --version v1 --kind CronJob --default
 
 This will scaffold the webhook functions and register your webhook with the manager in your
 [main.go](main.go) for you.
+
+### Deploying the cert manager
+We suggest using cert manager for provisioning the certificates for the webhook server. Other solutions should also
+work as long as they put the certificates in the desired location.
+
+Cert manager also has a component called CA injector, which is responsible for injecting the CA bundle into
+the Mutating|ValidatingWebhookConfiguration.
+
+To accomplish that, you need to use an annotation with key cert-manager.io/inject-ca-from in
+the Mutating|ValidatingWebhookConfiguration objects. The value of the annotation should point
+to an existing certificate CR instance in the format of <certificate-namespace>/<certificate-name>.
+
+This is the kustomize patch we used for annotating the Mutating|ValidatingWebhookConfiguration objects.
+
+```yaml
+# This patch add annotation to admission webhook config and
+# the variables $(CERTIFICATE_NAMESPACE) and $(CERTIFICATE_NAME) will be substituted by kustomize.
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mutating-webhook-configuration
+  annotations:
+    cert-manager.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating-webhook-configuration
+  annotations:
+    cert-manager.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
+```
+
+To install cert-manager, we recommend helm. Run below commands:
+```shell
+$ helm repo add jetstack https://charts.jetstack.io
+$ helm repo update
+$ helm install \
+    cert-manager jetstack/cert-manager \
+    --namespace cert-manager \
+    --create-namespace \
+    --version v1.5.4 \
+    --set installCRDs=true
+```
 
 ## Architectural Concept Diagram
 The following diagram will help you get a better idea over the Kubebuilder concepts and architecture.
