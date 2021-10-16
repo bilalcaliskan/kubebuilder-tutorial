@@ -16,38 +16,96 @@ limitations under the License.
 
 package main
 
+/*
+Our package starts out with some basic imports. Particularly:
+  - The core controller-runtime library
+  - The default controller-runtime logging, Zap (more on that a bit later)
+
+What does controller-runtime library?
+The Kubernetes controller-runtime Project is a set of go libraries for building Controllers. It is leveraged by
+Kubebuilder and Operator SDK.
+
+Package controllerruntime provides tools to construct Kubernetes-style controllers that manipulate both Kubernetes
+CRDs and aggregated/built-in Kubernetes APIs.
+
+It defines easy helpers for the common use cases when building CRDs, built on top of customizable layers of abstraction.
+Common cases should be easy, and uncommon cases should be possible. In general, controller-runtime tries to guide users
+towards Kubernetes controller best-practices.
+
+The main entrypoint for controller-runtime is this root package, which contains all of the common types needed to get
+started building controllers:
+
+import (
+    ctrl "sigs.k8s.io/controller-runtime"
+)
+*/
+
 import (
 	"flag"
+	batchv1 "github.com/bilalcaliskan/kubebuilder-tutorial/api/v1"
+	"github.com/bilalcaliskan/kubebuilder-tutorial/controllers"
+	"k8s.io/apimachinery/pkg/runtime"
 	"os"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	batchv1 "github.com/bilalcaliskan/kubebuilder-tutorial/api/v1"
-	"github.com/bilalcaliskan/kubebuilder-tutorial/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
 var (
+	/*
+		Every set of controllers needs a Scheme, which provides mappings between Kinds and their corresponding Go types.
+
+		scheme defines methods for serializing and deserializing API objects, a type registry for converting group, version,
+		and kind information to and from Go schemas, and mappings between Go schemas of different versions. A scheme is the
+		foundation for a versioned API and versioned configuration over time.
+
+		In a scheme, a Type is a particular Go struct, a Version is a point-in-time identifier for a particular
+		representation of that Type (typically backwards compatible), a Kind is the unique name for that Type within the
+		Version, and a Group identifies a set of Versions, Kinds, and Types that evolve over time. An Unversioned Type is
+		one that is not yet formally bound to a type and is promised to be backwards compatible (effectively a "v1" of a
+		Type that does not expect to break in the future).
+
+		Schemes are not expected to change at runtime and are only threadsafe after registration is complete.
+	*/
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
 
 func init() {
+	/*
+		Notice is that kubebuilder has added the new API group’s package (batchv1) to our scheme. This means that we can
+		use those objects in our controller.
+
+		If we would be using any other CRD we would have to add their scheme the same way. Builtin types such as Job have
+		their scheme added by clientgoscheme.
+	*/
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(batchv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
+	/*
+		At this point, our main function is fairly simple:
+			- We set up some basic flags for metrics.
+			- We instantiate a manager, which keeps track of running all of our controllers, as well as setting up
+			shared caches and clients to the API server (notice we tell the manager about our Scheme).
+			- We run our manager, which in turn runs all of our controllers and webhooks. The manager is set up to
+			run until it receives a graceful shutdown signal. This way, when we’re running on Kubernetes, we behave
+			nicely with graceful pod termination.
+
+		Package manager(sigs.k8s.io/controller-runtime/pkg/manager) is required to create Controllers and provides
+		shared dependencies such as clients, caches, schemes, etc. Controllers must be started by calling Manager.Start.
+	*/
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -77,6 +135,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Kubebuilder has added a block calling our CronJob controller’s SetupWithManager method.
 	if err = (&controllers.CronJobReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
