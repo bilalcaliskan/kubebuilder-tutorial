@@ -36,6 +36,11 @@ $ make run ENABLE_WEBHOOKS=false
 ```
 
 ### Run It On the Cluster
+Install the CRDs into the cluster:
+```shell
+$ make install
+```
+
 Build and push your image to the location specified by IMG:
 ```shell
 $ make docker-build docker-push IMG=<some-registry>/<project-name>:tag
@@ -46,16 +51,21 @@ Deploy the controller to the cluster with image specified by IMG:
 $ make deploy IMG=<some-registry>/<project-name>:tag
 ```
 
-### Uninstall CRDs
-To delete your CRDs from the cluster:
-```shell
-$ make uninstall
-```
-
 ### Undeploy controller
 Undeploy the controller from cluster:
 ```shell
 $ make undeploy
+```
+
+Make sure we deleted CRD from our cluster:
+```shell
+$ make uninstall
+```
+
+### Uninstall CRDs
+To delete your CRDs from the cluster:
+```shell
+$ make uninstall
 ```
 
 ### Implementing defaulting/validating webhooks
