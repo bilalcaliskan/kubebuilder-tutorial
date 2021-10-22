@@ -38,8 +38,6 @@ func (r *CronJob) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-
 /*
 Notice that we use kubebuilder markers to generate webhook manifests. This marker is responsible for generating a
 mutating webhook manifest.
@@ -78,6 +76,7 @@ func (r *CronJob) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
+
 // This marker is responsible for generating a validating webhook manifest.
 //+kubebuilder:webhook:path=/validate-batch-example-com-v1-cronjob,mutating=false,failurePolicy=fail,sideEffects=None,groups=batch.example.com,resources=cronjobs,verbs=create;update,versions=v1,name=vcronjob.kb.io,admissionReviewVersions={v1,v1beta1}
 

@@ -153,6 +153,26 @@ The apiserver by default doesn’t authenticate itself to the webhooks. However,
 to authenticate the clients, you can configure the apiserver to use basic auth, bearer token,
 or a cert to authenticate itself to the webhooks. You can find detailed steps [here](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#authenticate-apiservers).
 
+## Testing
+Testing Kubernetes controllers is a big subject, and the boilerplate testing files generated
+for you by kubebuilder are fairly minimal.
+
+To walk you through integration testing patterns for Kubebuilder-generated controllers, we
+will revisit the CronJob we built in our first tutorial and write a simple test for it.
+
+The basic approach is that, in your generated suite_test.go file, you will use [envtest](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/envtest)
+to create a local Kubernetes API server, instantiate and run your controllers, and then write
+additional `*_test.go` files to test it using [Ginkgo](https://onsi.github.io/ginkgo/).
+
+If you want to tinker with how your envtest cluster is configured, see section [Configuring envtest
+for integration tests](https://book.kubebuilder.io/reference/envtest.html) as well as the [envtest docs](https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/envtest).
+
+### What the heck is Ginkgo?
+Ginkgo is a Go testing framework built to help you efficiently write expressive and
+comprehensive tests using [Behavior-Driven Development (“BDD”)](https://en.wikipedia.org/wiki/Behavior-driven_development)
+style. It is best paired with the [Gomega](https://github.com/onsi/gomega) matcher library but is designed to be
+matcher-agnostic.
+
 ## Markers for Config/Code Generation
 KubeBuilder makes use of a tool called controller-gen for generating utility code and
 Kubernetes YAML. This code and config generation is controlled by the presence of special
