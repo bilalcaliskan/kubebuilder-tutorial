@@ -1,6 +1,7 @@
 domain: example.com
 layout:
 - go.kubebuilder.io/v3
+multigroup: true
 projectName: kubebuilder-tutorial
 repo: github.com/bilalcaliskan/kubebuilder-tutorial
 resources:
@@ -17,4 +18,12 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: example.com
+  group: config
+  kind: ProjectConfig
+  path: github.com/bilalcaliskan/kubebuilder-tutorial/apis/config/v1
+  version: v1
 version: "3"

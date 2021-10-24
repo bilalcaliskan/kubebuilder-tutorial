@@ -9,5 +9,5 @@ metrics:
 webhook:
   port: 9443
 leaderElection:
-  leaderElect: true
+  leaderElect: false
   resourceName: fdf6809e.example.com

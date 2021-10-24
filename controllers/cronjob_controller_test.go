@@ -20,10 +20,10 @@ package controllers
 
 import (
 	"context"
+	v12 "github.com/bilalcaliskan/kubebuilder-tutorial/apis/batch/v1"
 	"reflect"
 	"time"
 
-	cronjobv1 "github.com/bilalcaliskan/kubebuilder-tutorial/api/v1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
@@ -58,7 +58,7 @@ var _ = Describe("CronJob controller", func() {
 		It("Should increase CronJob Status.Active count when new Jobs are created", func() {
 			By("By creating a new CronJob")
 			ctx := context.Background()
-			cronJob := &cronjobv1.CronJob{
+			cronJob := &v12.CronJob{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "batch.tutorial.kubebuilder.io/v1",
 					Kind:       "CronJob",
@@ -67,7 +67,7 @@ var _ = Describe("CronJob controller", func() {
 					Name:      CronJobName,
 					Namespace: CronjobNamespace,
 				},
-				Spec: cronjobv1.CronJobSpec{
+				Spec: v12.CronJobSpec{
 					Schedule: "1 * * * *",
 					JobTemplate: batchv1beta1.JobTemplateSpec{
 						Spec: batchv1.JobSpec{
@@ -103,7 +103,7 @@ var _ = Describe("CronJob controller", func() {
 				In the examples below, timeout and interval are Go Duration values of our choosing.
 			*/
 			cronjobLookupKey := types.NamespacedName{Name: CronJobName, Namespace: CronjobNamespace}
-			createdCronjob := &cronjobv1.CronJob{}
+			createdCronjob := &v12.CronJob{}
 
 			// We'll need to retry getting this newly created CronJob, given that creation may not immediately happen.
 			Eventually(func() bool {
@@ -171,8 +171,8 @@ var _ = Describe("CronJob controller", func() {
 			}
 
 			// Note that your CronJob’s GroupVersionKind is required to set up this owner reference.
-			kind := reflect.TypeOf(cronjobv1.CronJob{}).Name()
-			gvk := cronjobv1.GroupVersion.WithKind(kind)
+			kind := reflect.TypeOf(v12.CronJob{}).Name()
+			gvk := v12.GroupVersion.WithKind(kind)
 
 			controllerRef := metav1.NewControllerRef(createdCronjob, gvk)
 			testJob.SetOwnerReferences([]metav1.OwnerReference{*controllerRef})

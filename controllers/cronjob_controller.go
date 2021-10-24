@@ -24,7 +24,7 @@ than those scaffolded for us.  We'll talk about each one when we use it.
 import (
 	"context"
 	"fmt"
-	batchv1 "github.com/bilalcaliskan/kubebuilder-tutorial/api/v1"
+	"github.com/bilalcaliskan/kubebuilder-tutorial/apis/batch/v1"
 	"github.com/robfig/cron"
 	kbatch "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -104,7 +104,7 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 		Many client methods also take variadic options at the end.
 	*/
-	var cronJob batchv1.CronJob
+	var cronJob v1.CronJob
 	if err := r.Get(ctx, req.NamespacedName, &cronJob); err != nil {
 		logger.Error(err, "unable to fetch CronJob")
 		/*
@@ -324,7 +324,7 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		just use the latest), and the next run, so that we can know when it's time to reconcile again.
 	*/
 
-	getNextSchedule := func(cronJob *batchv1.CronJob, now time.Time) (lastMissed time.Time, next time.Time, err error) {
+	getNextSchedule := func(cronJob *v1.CronJob, now time.Time) (lastMissed time.Time, next time.Time, err error) {
 		sched, err := cron.ParseStandard(cronJob.Spec.Schedule)
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("unparseable schedule %q: %v", cronJob.Spec.Schedule, err)
@@ -420,13 +420,13 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		We need to figure out how to run this job -- concurrency policy might forbid us from running multiple at the
 		same time...
 	*/
-	if cronJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent && len(activeJobs) > 0 {
+	if cronJob.Spec.ConcurrencyPolicy == v1.ForbidConcurrent && len(activeJobs) > 0 {
 		logger.V(1).Info("concurrency policy blocks concurrent runs, skipping", "num active", len(activeJobs))
 		return scheduledResult, nil
 	}
 
 	// ...or instruct us to replace existing ones...
-	if cronJob.Spec.ConcurrencyPolicy == batchv1.ReplaceConcurrent {
+	if cronJob.Spec.ConcurrencyPolicy == v1.ReplaceConcurrent {
 		for _, activeJob := range activeJobs {
 			// We don't care if the job was already deleted
 			if err := r.Delete(ctx, activeJob, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
@@ -447,7 +447,7 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		when we delete the CronJob, and allows controller-runtime to figure out which cronjob needs to be reconciled
 		when a given job changes (is added, deleted, completes, etc).
 	*/
-	constructJobForCronJob := func(cronJob *batchv1.CronJob, scheduledTime time.Time) (*kbatch.Job, error) {
+	constructJobForCronJob := func(cronJob *v1.CronJob, scheduledTime time.Time) (*kbatch.Job, error) {
 		// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
 		name := fmt.Sprintf("%s-%d", cronJob.Name, scheduledTime.Unix())
 
@@ -519,7 +519,7 @@ call Reconcile on the underlying CronJob when a Job changes, is deleted, etc.
 */
 var (
 	jobOwnerKey = ".metadata.controller"
-	apiGVStr    = batchv1.GroupVersion.String()
+	apiGVStr    = v1.GroupVersion.String()
 )
 
 func (r *CronJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -547,7 +547,7 @@ func (r *CronJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&batchv1.CronJob{}).
+		For(&v1.CronJob{}).
 		Owns(&kbatch.Job{}).
 		Complete(r)
 }
